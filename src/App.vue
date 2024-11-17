@@ -5,7 +5,31 @@ import Button from "./components/ui/Button.vue";
 const showMode = ref("all"); // all, removed, not-removed
 const isMessagesLoading = ref(false);
 const messages = ref([]);
+const reactions = ref([]);
+const room = ref(null);
 const filteredMessages = ref([]);
+
+function handleReactions(event) {
+  const targetMessage = messages.value.find(
+    (message) => message.label === event.data.messageId
+  );
+
+  if (targetMessage) {
+    if (!targetMessage.reactions) {
+      targetMessage.reactions = {};
+    }
+
+    if (!targetMessage.reactions[event.data.reactionName]) {
+      targetMessage.reactions[event.data.reactionName] = 0;
+    }
+
+    if (event.removed) {
+      targetMessage.reactions[event.data.reactionName]--;
+    } else {
+      targetMessage.reactions[event.data.reactionName]++;
+    }
+  }
+}
 
 function handleFileUpload(event) {
   isMessagesLoading.value = true;
@@ -14,9 +38,41 @@ function handleFileUpload(event) {
   reader.onload = (event) => {
     const data = JSON.parse(event.target.result);
     messages.value = data.events.filter((event) => event.type === "message");
+    reactions.value = data.events.filter((event) => event.type === "reaction");
+
+    for (const reaction of reactions.value) {
+      handleReactions(reaction);
+    }
+
+    room.value = data.room;
     isMessagesLoading.value = false;
   };
   reader.readAsText(file);
+}
+
+function getEmojiForReaction(reaction) {
+  const map = {
+    heart: "❤️",
+    thumbsup: "👍",
+    wave: "👋",
+    grinning_face_with_big_eyes: "😃",
+    slightly_frowning_face: "🙁",
+    fox_face: "🦊",
+    heavy_plus_sign: "➕",
+    heavy_minus_sign: "➖",
+    one: "1️⃣",
+    two: "2️⃣",
+    three: "3️⃣",
+    four: "4️⃣",
+    five: "5️⃣",
+    six: "6️⃣",
+    seven: "7️⃣",
+    eight: "8️⃣",
+    nine: "9️⃣",
+    zero: "0️⃣",
+  };
+
+  return map[reaction] || "?";
 }
 
 watch(messages, (newMessages) => {
@@ -39,7 +95,7 @@ watch(showMode, (newMode) => {
 </script>
 
 <template>
-  <main class="p-4 flex flex-col gap-6">
+  <header class="p-4 flex flex-col gap-4">
     <h1 class="text-4xl font-semibold">Foxford Events Viewer</h1>
 
     <Button as="label" class="relative focus-within:ring-4">
@@ -51,8 +107,9 @@ watch(showMode, (newMode) => {
       />
       <span> Загрузить JSON файл </span>
     </Button>
-
-    <section class="flex flex-col gap-6 border-t pt-4" v-if="messages.length">
+  </header>
+  <main class="p-4 grid grid-cols-2 gap-6 border-t">
+    <section class="flex flex-col gap-6" v-if="messages.length">
       <h2 class="text-2xl font-medium">Сообщения в чате</h2>
 
       <div class="flex gap-4 p-4 bg-gray-200 w-fit border border-gray-300">
@@ -70,9 +127,7 @@ watch(showMode, (newMode) => {
         </Button>
       </div>
 
-      <ul
-        class="flex flex-col gap-2 bg-gray-200 border border-gray-300 p-4 max-w-xl"
-      >
+      <ul class="flex flex-col gap-2 bg-gray-200 border border-gray-300 p-4">
         <li
           class="p-4 border border-gray-400 bg-gray-300 flex flex-col gap-1"
           :class="{
@@ -92,6 +147,16 @@ watch(showMode, (newMode) => {
               })
             }}
           </p>
+          <ul v-if="message.reactions" class="flex gap-2">
+            <li
+              v-for="(count, reaction) in message.reactions"
+              :key="reaction"
+              class="py-1 px-2 border border-black/10 bg-black/10 flex gap-2 text-[0.9rem] font-medium"
+            >
+              <span>{{ getEmojiForReaction(reaction) }}</span>
+              <span>{{ count }}</span>
+            </li>
+          </ul>
           <p v-if="message.removed_reason" class="text-red-500">
             Reason: {{ message.removed_reason }}
           </p>
@@ -99,9 +164,30 @@ watch(showMode, (newMode) => {
       </ul>
     </section>
 
-    <section class="flex gap-6 itesm-center" v-else-if="isMessagesLoading">
+    <section class="flex gap-6 items-center" v-else-if="isMessagesLoading">
       <img src="/ios-spinner.svg" alt="" class="w-8 aspect-square" />
-      <p class="text-xl">Загрузка сообщений...</p>
+      <p class="text-xl">Обработка...</p>
+    </section>
+
+    <section class="flex flex-col gap-6" v-if="room">
+      <h2 class="text-2xl font-medium">Информация о комнате</h2>
+      <ul class="border bg-gray-200 border-gray-300 p-4">
+        <li>
+          <p class="font-bold">ID:</p>
+          <p>{{ room.id }}</p>
+        </li>
+        <li>
+          <p class="font-bold">Дата начала вебинара:</p>
+          <p>
+            {{
+              new Date(room?.opened_at).toLocaleDateString("ru-RU", {
+                hour: "2-digit",
+                minute: "2-digit",
+              })
+            }}
+          </p>
+        </li>
+      </ul>
     </section>
   </main>
 </template>
