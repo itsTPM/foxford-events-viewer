@@ -6,6 +6,7 @@ const showMode = ref("all"); // all, removed, not-removed
 const isMessagesLoading = ref(false);
 const messages = ref([]);
 const reactions = ref([]);
+const hosts = ref([]);
 const room = ref(null);
 const filteredMessages = ref([]);
 
@@ -31,6 +32,16 @@ function handleReactions(event) {
   }
 }
 
+function handleHosts(events) {
+  const hostsSet = new Set();
+
+  for (const event of events) {
+    hostsSet.add(event.data.id);
+  }
+
+  hosts.value = Array.from(hostsSet);
+}
+
 function handleFileUpload(event) {
   isMessagesLoading.value = true;
   const file = event.target.files[0];
@@ -39,10 +50,13 @@ function handleFileUpload(event) {
     const data = JSON.parse(event.target.result);
     messages.value = data.events.filter((event) => event.type === "message");
     reactions.value = data.events.filter((event) => event.type === "reaction");
+    const hostsEvents = data.events.filter((event) => event.type === "leader");
 
     for (const reaction of reactions.value) {
       handleReactions(reaction);
     }
+
+    handleHosts(hostsEvents);
 
     room.value = data.room;
     isMessagesLoading.value = false;
@@ -188,6 +202,15 @@ watch(showMode, (newMode) => {
           </p>
         </li>
       </ul>
+      <hr />
+      <template v-if="hosts">
+        <h2 class="text-2xl font-medium">Хосты</h2>
+        <ul class="border bg-gray-200 border-gray-300 p-4">
+          <li v-for="host in hosts" :key="host">
+            <p>{{ host }}</p>
+          </li>
+        </ul>
+      </template>
     </section>
   </main>
 </template>
